@@ -97,8 +97,10 @@
     line-height:1.6;
     color:rgba(250,246,240,0.9);
     text-align:left;
-    display:none;
     resize:vertical;
+  }
+  #liveText::placeholder{
+    color:rgba(250,246,240,0.35);
   }
   #liveText:focus{
     outline:none;
@@ -142,8 +144,8 @@
     <button id="recordBtn">🎙️</button>
     <div id="hint">Tap the mic to start</div>
 
-    <div id="transcriptLabel" style="display:none;margin-top:20px;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:rgba(217,184,116,0.7);text-align:left;">Transcript (tap to edit)</div>
-    <textarea id="liveText" rows="4"></textarea>
+    <div style="margin-top:20px;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:rgba(217,184,116,0.7);text-align:left;">Transcript (speak or type)</div>
+    <textarea id="liveText" rows="4" placeholder="Tap the mic and speak, or type here directly…"></textarea>
 
     <button id="logBtn">Log to Sheet</button>
 
@@ -157,7 +159,6 @@
   const recordBtn = document.getElementById('recordBtn');
   const hintEl = document.getElementById('hint');
   const liveTextEl = document.getElementById('liveText');
-  const transcriptLabelEl = document.getElementById('transcriptLabel');
   const logBtn = document.getElementById('logBtn');
   const statusEl = document.getElementById('status');
 
@@ -186,8 +187,6 @@
           interim += text;
         }
       }
-      liveTextEl.style.display = 'block';
-      transcriptLabelEl.style.display = 'block';
       liveTextEl.value = finalTranscript + interim;
     };
 
@@ -208,8 +207,6 @@
   function startRecording() {
     finalTranscript = '';
     liveTextEl.value = '';
-    liveTextEl.style.display = 'none';
-    transcriptLabelEl.style.display = 'none';
     logBtn.classList.remove('show');
     statusEl.textContent = '';
     statusEl.className = '';
@@ -249,12 +246,6 @@
     const transcript = liveTextEl.value.trim();
     if (!transcript) return;
 
-    if (WEB_APP_URL === 'https://script.google.com/macros/s/AKfycbwVrCQg_XpaqQIqfjte-W_dffUb0zWIIUwNogAP0JIMmXmb_6rmHAMiF8C926Ci-Kyz/exec') {
-      statusEl.textContent = 'Web App URL not set up yet — ask your team to configure it.';
-      statusEl.className = 'error';
-      return;
-    }
-
     logBtn.disabled = true;
     recordBtn.disabled = true;
     statusEl.textContent = 'Logging…';
@@ -271,9 +262,7 @@
         statusEl.textContent = '✓ Logged to the sheet.';
         statusEl.className = 'success';
         logBtn.classList.remove('show');
-        liveTextEl.style.display = 'none';
         liveTextEl.value = '';
-        transcriptLabelEl.style.display = 'none';
         hintEl.textContent = 'Tap the mic to send another';
         finalTranscript = '';
       } else {
