@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Send a Voice Note</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --burgundy:#5c1a2e;
+    --burgundy-deep:#3d0f1e;
+    --gold:#b98a3e;
+    --gold-light:#d9b874;
+    --cream:#faf6f0;
+    --red:#c0392b;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    min-height:100vh;
+    background:linear-gradient(160deg,var(--burgundy-deep) 0%,var(--burgundy) 55%,#4a1424 100%);
+    font-family:'Lora',serif;
+    color:var(--cream);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+  }
+  .card{
+    width:100%;
+    max-width:440px;
+    background:rgba(250,246,240,0.03);
+    border:1px solid rgba(217,184,116,0.35);
+    border-radius:16px;
+    padding:44px 34px;
+    backdrop-filter:blur(6px);
+    text-align:center;
+  }
+  h1{
+    font-family:'Playfair Display',serif;
+    font-size:25px;
+    font-weight:600;
+    margin:0 0 6px;
+    color:var(--gold-light);
+  }
+  .sub{
+    font-size:14px;
+    color:rgba(250,246,240,0.65);
+    margin:0 0 36px;
+  }
+
+  #recordBtn{
+    width:110px;
+    height:110px;
+    border-radius:50%;
+    border:2px solid var(--gold-light);
+    background:radial-gradient(circle at 35% 30%, #7a2340, var(--burgundy-deep));
+    color:var(--gold-light);
+    font-size:32px;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin:0 auto;
+    transition:all 0.25s ease;
+  }
+  #recordBtn.recording{
+    background:radial-gradient(circle at 35% 30%, #d24534, var(--red));
+    border-color:var(--red);
+    animation:pulse 1.6s infinite;
+  }
+  #recordBtn:disabled{opacity:0.4;cursor:not-allowed;animation:none;}
+  @keyframes pulse{
+    0%{box-shadow:0 0 0 0 rgba(192,57,43,0.5);}
+    70%{box-shadow:0 0 0 18px rgba(192,57,43,0);}
+    100%{box-shadow:0 0 0 0 rgba(192,57,43,0);}
+  }
+
+  #timer{
+    margin-top:18px;
+    font-family:'Playfair Display',serif;
+    font-size:20px;
+    color:var(--gold-light);
+    letter-spacing:1px;
+    min-height:26px;
+  }
+  #hint{
+    margin-top:6px;
+    font-size:13px;
+    color:rgba(250,246,240,0.55);
+    min-height:18px;
+  }
+
+  #logBtn{
+    display:none;
+    width:100%;
+    margin-top:26px;
+    padding:15px;
+    border:none;
+    border-radius:8px;
+    background:linear-gradient(135deg,var(--gold) 0%,#a1782f 100%);
+    color:var(--burgundy-deep);
+    font-family:'Lora',serif;
+    font-weight:600;
+    font-size:15px;
+    letter-spacing:0.4px;
+    cursor:pointer;
+  }
+  #logBtn.show{display:block;}
+  #logBtn:disabled{opacity:0.5;cursor:not-allowed;}
+  #logBtn:not(:disabled):hover{opacity:0.9;}
+
+  #status{
+    margin-top:20px;
+    font-size:13.5px;
+    min-height:18px;
+  }
+  #status.success{color:#8fbf8f;}
+  #status.error{color:#e39a9a;}
+  #status.working{color:var(--gold-light);}
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Send a Voice Note</h1>
+    <p class="sub">Tap to record, then tap Transcribe &amp; Log.</p>
+
+    <button id="recordBtn">🎙️</button>
+    <div id="timer"></div>
+    <div id="hint">Tap the mic to start</div>
+
+    <button id="logBtn">Transcribe &amp; Log</button>
+
+    <div id="status"></div>
+  </div>
+
+<script>
+  // Paste your deployed Apps Script Web App URL here.
+  const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwVrCQg_XpaqQIqfjte-W_dffUb0zWIIUwNogAP0JIMmXmb_6rmHAMiF8C926Ci-Kyz/exec';
+
+  const recordBtn = document.getElementById('recordBtn');
+  const timerEl = document.getElementById('timer');
+  const hintEl = document.getElementById('hint');
+  const logBtn = document.getElementById('logBtn');
+  const statusEl = document.getElementById('status');
+
+  let mediaRecorder = null;
+  let chunks = [];
+  let recordedBlob = null;
+  let isRecording = false;
+  let startTime = null;
+  let timerInterval = null;
+
+  function formatTime(ms) {
+    const totalSec = Math.floor(ms / 1000);
+    const m = String(Math.floor(totalSec / 60)).padStart(2, '0');
+    const s = String(totalSec % 60).padStart(2, '0');
+    return m + ':' + s;
+  }
+
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+      mediaRecorder = new MediaRecorder(stream, { mimeType });
+      chunks = [];
+
+      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+      mediaRecorder.onstop = () => {
+        recordedBlob = new Blob(chunks, { type: mimeType });
+        logBtn.classList.add('show');
+        stream.getTracks().forEach(t => t.stop());
+      };
+
+      mediaRecorder.start();
+      isRecording = true;
+      startTime = Date.now();
+      recordBtn.classList.add('recording');
+      recordBtn.textContent = '⏹️';
+      hintEl.textContent = 'Recording… tap to stop';
+      statusEl.textContent = '';
+      statusEl.className = '';
+      logBtn.classList.remove('show');
+
+      timerInterval = setInterval(() => {
+        timerEl.textContent = formatTime(Date.now() - startTime);
+      }, 250);
+    } catch (err) {
+      statusEl.textContent = 'Mic access denied or unavailable: ' + err.message;
+      statusEl.className = 'error';
+    }
+  }
+
+  function stopRecording() {
+    if (mediaRecorder && isRecording) {
+      mediaRecorder.stop();
+      isRecording = false;
+      clearInterval(timerInterval);
+      recordBtn.classList.remove('recording');
+      recordBtn.textContent = '🎙️';
+      hintEl.textContent = 'Tap Transcribe & Log to send, or tap the mic to re-record';
+    }
+  }
+
+  recordBtn.addEventListener('click', () => {
+    if (isRecording) stopRecording();
+    else startRecording();
+  });
+
+  function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  logBtn.addEventListener('click', async () => {
+    if (!recordedBlob) return;
+
+    if (WEB_APP_URL === 'PASTE_YOUR_WEB_APP_URL_HERE') {
+      statusEl.textContent = 'Web App URL not set up yet — ask your team to configure it.';
+      statusEl.className = 'error';
+      return;
+    }
+
+    logBtn.disabled = true;
+    recordBtn.disabled = true;
+    statusEl.textContent = 'Transcribing & logging…';
+    statusEl.className = 'working';
+
+    try {
+      const base64 = await blobToBase64(recordedBlob);
+      const ext = recordedBlob.type.includes('webm') ? 'webm' : 'm4a';
+      const fileName = 'Anshul_' + new Date().toISOString().replace(/[:.]/g, '-') + '.' + ext;
+
+      const response = await fetch(WEB_APP_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+          audio: base64,
+          fileName: fileName,
+          mimeType: recordedBlob.type
+        })
+      });
+      const result = await response.json();
+
+      if (result.success) {
+        statusEl.textContent = '✓ Logged to the sheet.';
+        statusEl.className = 'success';
+        logBtn.classList.remove('show');
+        timerEl.textContent = '';
+        hintEl.textContent = 'Tap the mic to send another';
+        recordedBlob = null;
+      } else {
+        statusEl.textContent = 'Error: ' + (result.error || 'Unknown error');
+        statusEl.className = 'error';
+      }
+    } catch (err) {
+      statusEl.textContent = 'Error: ' + err.message;
+      statusEl.className = 'error';
+    } finally {
+      logBtn.disabled = false;
+      recordBtn.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
