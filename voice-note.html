@@ -174,7 +174,7 @@
     recordBtn.disabled = true;
   } else {
     recognition = new SpeechRecognition();
-    recognition.continuous = true;
+    recognition.continuous = false;   // capture one utterance at a time, then auto-restart — avoids Chrome's cumulative-result bug in continuous mode
     recognition.interimResults = true;
     recognition.lang = 'en-IN';
 
@@ -194,6 +194,10 @@
     };
 
     recognition.onerror = (event) => {
+      // "no-speech" fires often in chunked mode during natural pauses — not a real error, just restart quietly.
+      if (event.error === 'no-speech' || event.error === 'aborted') {
+        return;
+      }
       statusEl.textContent = 'Mic error: ' + event.error;
       statusEl.className = 'error';
       stopRecording();
@@ -203,7 +207,11 @@
       finalTranscript = (finalTranscript + sessionFinal).replace(/\s+/g, ' ').trim() + ' ';
       sessionFinal = '';
       if (isRecording) {
-        recognition.start();
+        try {
+          recognition.start();
+        } catch (e) {
+          setTimeout(() => { if (isRecording) recognition.start(); }, 150);
+        }
       }
     };
   }
